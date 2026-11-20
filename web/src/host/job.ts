@@ -2,7 +2,7 @@
 // rules and project.json.
 
 import type { FrameInfo, JobConfig, JobEvent, MaskOptions, MaskStats, ModelStats, Msg, ProjectState, Stage } from "../../../src/lib/api";
-import { train } from "../brush";
+import { train, type TrainEvents } from "../brush";
 import { extractFrames, framesFromImages, probeVideo, type PickedFrame } from "../pipeline/frames";
 import { buildAlpha, listImages, makeMasks } from "../pipeline/masks";
 import { encodePng } from "../pipeline/png";
@@ -11,6 +11,7 @@ import { DEFAULT_SFM, runSfm } from "../sfm";
 import { renameImages, writeModel } from "../sfm/colmap";
 import { dirAt, exists, inputImage, publish, publishDir, readFile, remove, requestPersistence, stem, unpublishUnder, video, writeFile } from "./files";
 import { externalMasks } from "./masksource";
+import { opfsDataset, trainRemote } from "./remote-train";
 import { IMAGE_EXT, layout, pruneProjects, readState, saveState } from "./project";
 
 const ORDER: Stage[] = ["frames", "masks", "poses", "train"];
@@ -211,34 +212,34 @@ async function run(cfg: JobConfig, emit: (e: JobEvent) => void, signal: AbortSig
   await remove(l.training);
   let lastPsnr: number | null = null;
   let snapshot: string | null = null;
-  const ply = await train(
-    await dirAt(dataset),
-    cfg.train,
-    m.enabled,
-    {
-      status: (msg) => rep.progress(0, msg),
-      dataset: (n, e) => rep.log(`dataset: ${n} training views${e ? `, ${e} for evaluation` : ""}`),
-      step: (iter, splats) => {
-        rep.progress(iter / total, { key: "train.step", args: { iter, total, splats } });
-        emit({ type: "train", event: { kind: "step", iter, splats } });
-      },
-      eval: (iter, psnr, ssim) => {
-        lastPsnr = psnr;
-        rep.log(`eval at step ${iter}: PSNR ${psnr.toFixed(2)} dB, SSIM ${ssim.toFixed(3)}`);
-        emit({ type: "train", event: { kind: "eval", iter, psnr, ssim } });
-      },
-      snapshot: (iter, data) => {
-        // Previews stay in memory only; publish revokes the previous one.
-        const path = `${l.training}/export_${iter}.ply`;
-        publish(path, new Blob([data as BlobPart]));
-        if (snapshot) unpublishUnder(snapshot);
-        snapshot = path;
-        emit({ type: "train", event: { kind: "snapshot", iter, path } });
-      },
-      log: rep.log,
+  const events: TrainEvents = {
+    status: (msg) => rep.progress(0, msg),
+    dataset: (n, e) => rep.log(`dataset: ${n} training views${e ? `, ${e} for evaluation` : ""}`),
+    step: (iter, splats) => {
+      rep.progress(iter / total, { key: "train.step", args: { iter, total, splats } });
+      emit({ type: "train", event: { kind: "step", iter, splats } });
     },
-    signal,
-  );
+    eval: (iter, psnr, ssim) => {
+      lastPsnr = psnr;
+      rep.log(`eval at step ${iter}: PSNR ${psnr.toFixed(2)} dB, SSIM ${ssim.toFixed(3)}`);
+      emit({ type: "train", event: { kind: "eval", iter, psnr, ssim } });
+    },
+    snapshot: (iter, data) => {
+      // Previews stay in memory only; publish revokes the previous one.
+      const path = `${l.training}/export_${iter}.ply`;
+      publish(path, new Blob([data as BlobPart]));
+      if (snapshot) unpublishUnder(snapshot);
+      snapshot = path;
+      emit({ type: "train", event: { kind: "snapshot", iter, path } });
+    },
+    log: rep.log,
+  };
+  // On a training host when one is chosen (docs/host.md); everything before
+  // and after this stage stays in the browser.
+  const remote = cfg.trainHost && cfg.trainHost.backend !== "browser" ? cfg.trainHost : null;
+  const ply = remote
+    ? await trainRemote(opfsDataset(await dirAt(dataset)), cfg.train, m.enabled, remote, events, signal)
+    : await train(await dirAt(dataset), cfg.train, m.enabled, events, signal);
   publish(l.finalPly, await writeFile(l.finalPly, ply as BufferSource));
   rep.progress(1, { key: "train.done" });
   // New splat: the pre-retouch one is no longer a valid base (the clips still are).

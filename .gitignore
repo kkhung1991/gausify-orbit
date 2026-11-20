@@ -29,6 +29,10 @@ web/.brush/
 web/pkg/
 dist-web
 
+# Native Brush built by `pnpm host:brush`
+host/bin/
+__pycache__/
+
 # Local wrangler cache (web deploy)
 .wrangler/
 

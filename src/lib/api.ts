@@ -224,6 +224,23 @@ export interface TrainOptions {
   growthStopIter?: number;
 }
 
+/** Where the Training stage runs: Brush in this browser (WebGPU), or on a
+ *  training host (host/server.mjs, docs/host.md) with native Brush (Vulkan)
+ *  or gsplat (CUDA). Frames, masks and poses always run in the browser. */
+export type TrainBackend = "browser" | "brush" | "gsplat";
+export const TRAIN_BACKENDS: TrainBackend[] = ["browser", "brush", "gsplat"];
+
+/** Kept apart from the quality presets (App stores it on its own). */
+export interface TrainHost {
+  backend: TrainBackend;
+  /** The host's address, e.g. http://localhost:1441. */
+  url: string;
+  /** Access token, when the host was started with one. */
+  token: string;
+  /** GPU index on the host, or "auto": the first free one. */
+  gpu: number | "auto";
+}
+
 export interface Settings {
   frames: Omit<FrameOptions, "trimStart" | "trimEnd">;
   poses: PoseOptions;
@@ -241,6 +258,8 @@ export interface JobConfig extends Omit<Settings, "frames"> {
   toStage?: Stage;
   frames: FrameOptions;
   masks: MaskOptions;
+  /** Missing or backend "browser": training runs in this browser. */
+  trainHost?: TrainHost;
 }
 
 export interface FrameInfo {

@@ -10,6 +10,7 @@ import {
   type JobEvent,
   STAGES,
   type MaskMethod,
+  type TrainHost,
   type MaskOptions,
   type MaskSource,
   POSE_CHECK_MODES,
@@ -38,6 +39,7 @@ import { MASK_METHODS } from "./components/MasksPanel";
 import { GitHubLink } from "./components/GitHubLink";
 import { LanguageSelect } from "./components/LanguageSelect";
 import { ComfySettingsButton } from "./components/ComfySettings";
+import { loadTrainHost, saveTrainHost } from "./lib/trainhost";
 import { UpdateBanner } from "./components/UpdateBanner";
 import { useSidebarWidth } from "./components/SidebarResizer";
 import { promptInTrim } from "./lib/prompt";
@@ -229,6 +231,10 @@ function AppView() {
   const [poseCheck, setPoseCheck] = useState<PoseCheckMode>(loadPoseCheck);
   const poseCheckRef = useRef(poseCheck);
   poseCheckRef.current = poseCheck;
+  /** Where training runs, likewise apart from the quality settings. */
+  const [trainHost, setTrainHost] = useState<TrainHost>(loadTrainHost);
+  const trainHostRef = useRef(trainHost);
+  trainHostRef.current = trainHost;
   const [defaultMasks, setDefaultMasks] = useState<MaskOptions>(loadMasks);
   const defaultMasksRef = useRef(defaultMasks);
   defaultMasksRef.current = defaultMasks;
@@ -332,6 +338,8 @@ function AppView() {
       /* ignore */
     }
   }, [poseCheck]);
+
+  useEffect(() => saveTrainHost(trainHost), [trainHost]);
 
   useEffect(() => {
     try {
@@ -661,6 +669,7 @@ function AppView() {
           masks: promptInTrim(masks.prompt, trim) ? masks : { ...masks, prompt: null },
           poses: { ...s.poses, estimator: estimatorRef.current, check: poseCheckRef.current },
           train: s.train,
+          trainHost: trainHostRef.current,
         },
         (e) => onEvent(id, e),
       );
@@ -888,6 +897,8 @@ function AppView() {
         onEstimator={setEstimator}
         poseCheck={poseCheck}
         onPoseCheck={setPoseCheck}
+        trainHost={trainHost}
+        onTrainHost={setTrainHost}
         settings={settings}
         onSettings={(s) => {
           setSettings(s);

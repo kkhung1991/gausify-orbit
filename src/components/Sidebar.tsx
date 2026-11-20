@@ -1,8 +1,9 @@
 import { useRef, type ReactNode } from "react";
-import { fileUrl, type ImageSet, type MaskOptions, type MaskSource, type MaskSourceOf, type PoseCheckMode, type PoseEstimator, type Settings, type Stage, type SubjectPrompt, type VideoInfo } from "../lib/api";
+import { fileUrl, type ImageSet, type MaskOptions, type MaskSource, type MaskSourceOf, type PoseCheckMode, type PoseEstimator, type Settings, type Stage, type SubjectPrompt, type TrainHost, type VideoInfo } from "../lib/api";
 import { promptInTrim } from "../lib/prompt";
 import { PRESETS, REDUCE_HAZE_WEIGHT, type PresetId } from "../lib/presets";
 import { Field, NumField, Segmented, Toggle } from "./fields";
+import { TrainHostFields } from "./TrainHostFields";
 import { VideoPlayer } from "./VideoPlayer";
 import { ImageSequence } from "./ImageSequence";
 import { MasksPanel } from "./MasksPanel";
@@ -46,6 +47,9 @@ interface Props {
   /** Pose check (stored apart from the quality presets). */
   poseCheck: PoseCheckMode;
   onPoseCheck: (m: PoseCheckMode) => void;
+  /** Where training runs (stored apart from the quality presets). */
+  trainHost: TrainHost;
+  onTrainHost: (h: TrainHost) => void;
   settings: Settings;
   onSettings: (s: Settings) => void;
   masks: MaskOptions;
@@ -351,6 +355,7 @@ export function Sidebar(p: Props) {
               </Field>
 
               <h3>{ts.training}</h3>
+              <TrainHostFields value={p.trainHost} onChange={p.onTrainHost} />
               <div className="grid2">
                 <NumField label={ts.steps} value={s.train.totalSteps} min={1000} max={100000} step={1000}
                   onChange={(v) => set("train", { totalSteps: v })} />

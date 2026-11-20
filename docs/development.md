@@ -9,7 +9,8 @@
 | `web/` | Entry point, `Host` implementation (`web/src/host/`), pipeline, SfM, export, mesh, share viewer |
 | `web/brush/` | Patches applied to the pinned Brush commit |
 | `worker/` | Cloudflare Worker for share links |
-| `scripts/` | Brush build, benchmarks and a ComfyUI mock |
+| `host/` | Training host for a GPU machine: server, GPU scheduling, native Brush and gsplat trainers ([host.md](host.md)) |
+| `scripts/` | Brush build, benchmarks, headless batches and a ComfyUI mock |
 
 ## Running
 

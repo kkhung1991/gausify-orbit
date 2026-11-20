@@ -107,6 +107,13 @@ pnpm web:dev       # http://localhost:1440
 See **[docs/web.md](docs/web.md)** for the architecture, what had to be patched
 to train in the browser, and benchmarks.
 
+### Train on a GPU host
+
+Training can also run on a Linux machine with NVIDIA GPUs, such as a server
+you reach over SSH: with native Brush (Vulkan) or gsplat (CUDA) behind a small
+training host, or in headless Chrome, one per GPU. Two GPUs train two videos
+at once. See **[docs/host.md](docs/host.md)**.
+
 ## Usage
 
 1. Drop a video into the window, or drop several images or a folder.
@@ -140,6 +147,7 @@ the SfM and Brush use a single camera.
 |---|---|
 | [Pipeline design notes](docs/pipeline.md) | Why each stage works the way it does, masking methods, export format and measurements |
 | [Web version](docs/web.md) | Browser architecture, Brush WASM patches, SAM 2.1, in-browser SfM, benchmarks, Cloudflare deployment |
+| [Training on a GPU host](docs/host.md) | Native Brush or gsplat on a Linux machine's NVIDIA GPUs, the training host, GPU selection, headless batches |
 | [Share links](docs/sharing.md) | R2 storage, the WebXR viewer, expiry and limits, self-hosting the Worker |
 | [Mesh export](docs/mesh.md) | Splat → GLB: geometric fine-tune, depth fusion, extraction, hole filling, smoothing, UV and texture bake, and why each choice |
 | [Retouch with ComfyUI](docs/retouch.md) | Camera paths, reference rendering, ComfyUI integration and fine-tuning |
@@ -148,7 +156,7 @@ the SfM and Brush use a single camera.
 ## Tests
 
 ```bash
-pnpm test:web    # pipeline, SfM, export, mesh, retouch, worker
+pnpm test:web    # pipeline, SfM, export, mesh, retouch, worker, training host
 ```
 
 ## Acknowledgements and third-party licenses

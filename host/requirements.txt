@@ -1,0 +1,6 @@
+# gsplat trainer of the training host (docs/host.md). Install a CUDA build of
+# PyTorch first if pip would pick a CPU one: https://pytorch.org/get-started
+torch>=2.1
+gsplat>=1.4
+numpy
+pillow

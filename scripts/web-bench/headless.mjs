@@ -34,16 +34,24 @@
 // --reduce-haze ("Reduce haze": depth distortion, masked runs only), --ssim W
 // (SSIM loss weight; Preview has 0), --screenshot <file.png> (the window at the
 // end). Chrome
-// comes from CHROME (default: the macOS one in /Applications).
+// comes from CHROME (default: the macOS one in /Applications; on Linux,
+// google-chrome or chromium from the PATH, on Vulkan).
+//
+// Where training runs (docs/host.md): --backend browser|brush|gsplat (default
+// browser: in this Chrome), with --host-url (default http://localhost:1441),
+// --host-token and --host-gpu N for a training host. --gpu N runs this Chrome
+// on the N-th NVIDIA GPU (Linux; needs mesa-vulkan-drivers), so several of
+// these can run side by side, one per GPU (scripts/host-batch.mjs does that).
 //
 // The UI selectors below match pt-BR text, so the script forces the pt-BR locale.
 
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DEFAULT_CHROMA } from "../../src/lib/api.ts";
 import { presetById, REDUCE_HAZE_WEIGHT } from "../../src/lib/presets.ts";
+import { detectGpus, pinEnv } from "../../host/gpus.mjs";
 
 const [mode, url, ...rest] = process.argv.slice(2);
 const opt = (name, def) => {
@@ -57,7 +65,26 @@ if (!["train", "poses", "profile", "video"].includes(mode) || !url) {
 }
 
 const port = Number(process.env.CDP_PORT || 9333);
-const chromePath = process.env.CHROME || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+const linux = process.platform === "linux";
+const onPath = (names) => names.map((n) => spawnSync("which", [n], { encoding: "utf8" }).stdout.trim()).find(Boolean);
+const chromePath =
+  process.env.CHROME ||
+  (linux ? onPath(["google-chrome", "google-chrome-stable", "chromium", "chromium-browser"]) : "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome");
+if (!chromePath || !existsSync(chromePath)) {
+  console.error(`Chrome not found${chromePath ? ` at ${chromePath}` : ""}: set CHROME to its executable.`);
+  process.exit(2);
+}
+// One GPU for this Chrome: Vulkan only sees the one at that PCI address.
+let gpuEnv = {};
+if (opt("gpu") != null) {
+  const gpu = (await detectGpus()).find((g) => !g.pseudo && g.index === Number(opt("gpu")));
+  if (!gpu) {
+    console.error(`--gpu ${opt("gpu")}: nvidia-smi lists no such GPU.`);
+    process.exit(2);
+  }
+  gpuEnv = pinEnv("vulkan", gpu);
+  console.log(`Chrome on GPU ${gpu.index} (${gpu.name}, ${gpu.pci})`);
+}
 const profileDir = mkdtempSync(join(process.env.TMPDIR || tmpdir(), "splatforge-chrome-"));
 const chrome = spawn(
   chromePath,
@@ -68,13 +95,17 @@ const chrome = spawn(
     "--enable-gpu",
     "--ignore-gpu-blocklist",
     "--enable-unsafe-webgpu",
-    "--use-angle=metal",
+    // WebGPU on Linux needs Chrome's Vulkan backend, and headless has no
+    // window surface to give it.
+    ...(linux ? ["--use-angle=vulkan", "--enable-features=Vulkan", "--disable-vulkan-surface"] : ["--use-angle=metal"]),
+    // Chrome's sandbox refuses to start as root (containers).
+    ...(linux && process.getuid?.() === 0 ? ["--no-sandbox"] : []),
     "--no-first-run",
     "--no-default-browser-check",
     "--window-size=1280,800",
     "about:blank",
   ],
-  { stdio: "ignore" },
+  { stdio: "ignore", env: { ...process.env, ...gpuEnv } },
 );
 // Each run creates a profile (with copies of the models in OPFS): delete it on
 // exit, otherwise they pile up gigabytes on disk.
@@ -178,6 +209,14 @@ if (opt("opac-binary")) settings.train.opacBinaryWeight = Number(opt("opac-binar
 if (opt("volume")) settings.train.volumeRegWeight = Number(opt("volume"));
 if (flag("reduce-haze")) settings.train.depthDistortionWeight = REDUCE_HAZE_WEIGHT;
 if (opt("ssim")) settings.train.ssimWeight = Number(opt("ssim"));
+const hostGpu = opt("host-gpu");
+const trainHost = {
+  backend: opt("backend", "browser"),
+  url: opt("host-url", "http://localhost:1441"),
+  token: opt("host-token", ""),
+  gpu: hostGpu == null ? "auto" : Number(hostGpu),
+};
+if (!["browser", "brush", "gsplat"].includes(trainHost.backend)) fail(`--backend ${trainHost.backend}: use browser, brush or gsplat`);
 const mask = opt("mask");
 const masks = {
   enabled: !!mask,
@@ -197,6 +236,7 @@ await evaluate(`localStorage.setItem('splatforge.locale.v1', 'pt-BR');
   localStorage.setItem('splatforge.masks.v1', ${JSON.stringify(JSON.stringify(masks))});
   localStorage.setItem('splatforge.poseEstimator.v1', ${JSON.stringify(opt("estimator", "akaze"))});
   localStorage.setItem('splatforge.poseCheck.v1', ${JSON.stringify(opt("pose-check", "off"))});
+  localStorage.setItem('splatforge.trainHost.v1', ${JSON.stringify(JSON.stringify(trainHost))});
   localStorage.setItem('splatforge.export.v1', ${JSON.stringify(opt("export", "{}"))})`);
 await send("Page.navigate", { url });
 

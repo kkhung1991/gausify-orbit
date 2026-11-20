@@ -1,0 +1,17 @@
+diff --git a/apps/brush-cli/src/lib.rs b/apps/brush-cli/src/lib.rs
+index f6b4b1c..5357ca7 100644
+--- a/apps/brush-cli/src/lib.rs
++++ b/apps/brush-cli/src/lib.rs
+@@ -249,6 +249,12 @@ pub async fn run_cli_ui(
+                     }
+                     train_progress.set_position(iter as u64);
+                     duration = total_elapsed;
++                    // The progress bar only draws on a TTY, and refine lines
++                    // stop once growth does: a plain line for whoever runs
++                    // the CLI as a child process.
++                    if iter % 25 == 0 {
++                        log::info!("Step iter {iter}");
++                    }
+                 }
+                 TrainMessage::RefineStep {
+                     cur_splat_count,
