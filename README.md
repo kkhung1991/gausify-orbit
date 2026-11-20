@@ -6,7 +6,7 @@
 
 <p align="center">
   Turn <b>orbit videos</b>, including AI-generated ones, into <b>Gaussian Splats</b>.<br>
-  Runs 100% locally, entirely in the browser, on WebGPU.
+  Runs 100% locally, in the browser on WebGPU, or trains on your own GPU server.
 </p>
 
 <p align="center">
@@ -35,7 +35,9 @@ or a clip from a video model), and Gausify Orbit extracts the sharpest frames,
 optionally cuts out the subject, recovers the camera poses, trains a 3D Gaussian
 Splat with live previews and exports a compact `.sog`/`.ply` you can share
 with a link. It doesn't need CUDA or an install: everything runs in the browser
-on WebGPU.
+on WebGPU. If you have a Linux machine with NVIDIA GPUs, training can run there
+instead, with native Brush or gsplat, one video per GPU
+([Train on a GPU host](#train-on-a-gpu-host)).
 
 ```
 video ──► Frames ──────────► Masking ──────────► Poses ─────────────► Training ───────► splat.ply / .sog / .glb
@@ -68,6 +70,11 @@ video ──► Frames ──────────► Masking ─────
 - **GPU training without CUDA:** [Brush](https://github.com/ArthurBrussee/brush),
   pinned to a fixed commit and patched, compiled to WASM + WebGPU. A live 3D viewer
   ([Spark](https://sparkjs.dev)) reloads snapshots as training goes.
+- **Training on a GPU host (optional):** a **Train on** setting sends the
+  Training stage to a Linux machine with NVIDIA GPUs: the same Brush, native on
+  Vulkan, or [gsplat](https://github.com/nerfstudio-project/gsplat) on CUDA.
+  Each job gets a GPU of its own, so two GPUs train two videos at once, and a
+  headless batch runs a list of videos with one Chrome per GPU.
 - **Optimized export:** PlayCanvas SOG v2 (lossless WebP textures, k-means SH
   palette), decimation that merges similar Gaussians, an opacity floor and
   SH band trimming. Typical output is 5–15× smaller than the raw `.ply`.
@@ -110,9 +117,26 @@ to train in the browser, and benchmarks.
 ### Train on a GPU host
 
 Training can also run on a Linux machine with NVIDIA GPUs, such as a server
-you reach over SSH: with native Brush (Vulkan) or gsplat (CUDA) behind a small
-training host, or in headless Chrome, one per GPU. Two GPUs train two videos
-at once. See **[docs/host.md](docs/host.md)**.
+you reach over SSH. On that machine:
+
+```bash
+pnpm host:setup    # checks the machine, builds native Brush, creates the gsplat environment, builds the app
+pnpm host          # the training host and the app, on http://127.0.0.1:1441
+```
+
+On your computer, forward the port (`ssh -L 1441:localhost:1441 user@gpu-host`),
+open `http://localhost:1441` and pick **Train on** in the advanced settings.
+Frames, cutout and poses still run in your browser; training runs on the host
+and its previews and splat come back to the page.
+
+<p align="center">
+  <img src="assets/host.png" width="900" alt="Gausify Orbit with training sent to a GPU host: the Train on setting with the host's address and GPU in the sidebar, and the training stage reporting native Brush on the host">
+</p>
+
+The setting is part of this repository's app; a deployment built from an
+older version doesn't have it. See **[docs/host.md](docs/host.md)** for what
+the setup installs and what it leaves to you (the NVIDIA driver and, for
+gsplat, the CUDA toolkit), how GPUs are assigned, and headless batches.
 
 ## Usage
 

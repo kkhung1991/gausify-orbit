@@ -11,6 +11,7 @@
     "web:build": "vite build --config web/vite.config.ts",
     "web:deploy": "pnpm web:build && wrangler deploy",
     "host": "node host/server.mjs",
+    "host:setup": "bash host/setup.sh",
     "host:brush": "node scripts/build-brush-web.mjs --native",
     "test:web": "node --test web/src/*/*.test.ts src/lib/*.test.ts src/lib/*/*.test.ts worker/*.test.ts host/*.test.ts"
   },

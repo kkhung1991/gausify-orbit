@@ -8,8 +8,8 @@ Training) chooses between them:
 | Train on | Where training runs | GPU API | The host needs |
 |---|---|---|---|
 | **This browser (WebGPU)** | Brush as WebAssembly, in the page | WebGPU (Vulkan on Linux) | Chrome on the host, for its GPUs to be the ones used |
-| **Host: Brush (Vulkan)** | the same Brush, native, started by the training host | Vulkan | `pnpm host:brush` |
-| **Host: gsplat (CUDA)** | [gsplat](https://github.com/nerfstudio-project/gsplat), started by the training host | CUDA | `pip install -r host/requirements.txt` |
+| **Host: Brush (Vulkan)** | the same Brush, native, started by the training host | Vulkan | `pnpm host:setup --brush` |
+| **Host: gsplat (CUDA)** | [gsplat](https://github.com/nerfstudio-project/gsplat), started by the training host | CUDA | `pnpm host:setup --gsplat` |
 
 With the two host options, frames, cutout and poses still run in the browser
 you are using (your laptop is fine); when the Training stage starts, the page
@@ -30,12 +30,30 @@ the machine with the GPUs, takes training jobs from the page and gives each
 one a GPU.
 
 ```bash
-pnpm install
-pnpm host:brush                           # native Brush → host/bin/brush (Rust; ~15 min, once)
-pip install -r host/requirements.txt      # gsplat (a CUDA build of PyTorch)
-node host/server.mjs --check              # lists the GPUs and which trainers are ready
-pnpm host                                 # http://127.0.0.1:1441
+pnpm host:setup --check     # what the machine has and what is missing
+pnpm host:setup             # builds native Brush, the gsplat environment and the app; tests the trainers
+pnpm host                   # the host and the app, on http://127.0.0.1:1441
 ```
+
+`host/setup.sh` sets up what lives in this folder and tells you about the
+rest:
+
+| | Set up by `pnpm host:setup` | You install (it prints the command) |
+|---|---|---|
+| Both | the app's packages (`pnpm install`) | NVIDIA driver, Node 22.18+, pnpm, a C/C++ compiler |
+| Native Brush | `host/bin/brush`, built from the pinned commit and patches (~15 min, once) | Rust (rustup) |
+| gsplat | `host/.venv` with a PyTorch build matching the machine's CUDA toolkit, gsplat and its CUDA code compiled | Python 3 with venv, **the CUDA toolkit (`nvcc`)** |
+| The app | `dist-web`, the page with the **Train on** setting (Brush as WebAssembly, ~25 min, once; fetches `wasm-pack` with cargo) | Rust (rustup) |
+| Headless Chrome per GPU | | Chrome, `mesa-vulkan-drivers`, `vulkan-tools` |
+
+The driver is not enough for gsplat: it compiles its CUDA kernels on the
+machine the first time it runs, which takes the CUDA toolkit. Native Brush
+needs no CUDA at all, only the driver's Vulkan. `--apt` lets the script run
+`sudo apt-get install` for the missing system packages (never the driver);
+`--brush`, `--gsplat` and `--app` set up one part only. At the end it renders a
+test image with gsplat on the GPU and prints what `node host/server.mjs
+--check` sees. "Ready" means gsplat rendered on the GPU and the Brush binary
+is built; Brush itself first touches the GPU in its first job.
 
 Either trainer is enough; the page says which ones the host has. Native Brush
 is built from the same pinned commit and patches as the browser's
@@ -51,16 +69,18 @@ The host listens on loopback. From another computer, forward the port:
 ssh -L 1441:localhost:1441 user@gpu-host
 ```
 
-and leave **Host address** at `http://localhost:1441`. The tunnel is also
-what makes it work from `https://orbit.gausify.com`: browsers let a secure
-page call `http://localhost`, but not plain HTTP anywhere else (Chrome may
-ask once for permission to reach local devices). `--listen 0.0.0.0` exposes
-the port directly and requires `--token <secret>`, entered as **Access
-token**; that only works for a page that is itself served over HTTP on
-localhost.
+and open `http://localhost:1441`: once the app is built, the host serves it
+on the same port, so the page and the host share an address and **Host
+address** can stay at `http://localhost:1441`. The tunnel also keeps the page
+a secure context, which WebGPU and the browser's storage require.
 
-If the app was built on the host (`pnpm web:wasm && pnpm web:build`), the
-host serves it too: open `http://localhost:1441` through the same tunnel.
+The **Train on** setting is part of this repository's app, so use a page
+built from it: the one the host serves, `pnpm web:dev`, or your own
+deployment. A page served over HTTPS can reach the host too, but only at
+`http://localhost` (through the tunnel); browsers block plain HTTP to any
+other address from a secure page, and Chrome may ask once for permission to
+reach local devices. `--listen 0.0.0.0` exposes the port directly and
+requires `--token <secret>`, entered as **Access token**.
 
 ### GPUs
 
@@ -146,7 +166,10 @@ Chrome's SwiftShader):
   two-GPU machine (all three mechanisms) and every speed figure are
   untested.
 
-So on the real machine: run `node host/server.mjs --check`, then train one
+`host/setup.sh` ran here as far as a machine without a GPU allows: the
+checks, the Brush build, and the gsplat environment up to its GPU test.
+
+So on the real machine: run `pnpm host:setup`, then train one
 video with each option and compare the three splats and their PSNR (turn on
 **Measure quality**) before relying on any of them.
 

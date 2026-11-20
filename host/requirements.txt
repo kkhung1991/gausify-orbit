@@ -1,5 +1,6 @@
-# gsplat trainer of the training host (docs/host.md). Install a CUDA build of
-# PyTorch first if pip would pick a CPU one: https://pytorch.org/get-started
+# gsplat trainer of the training host (docs/host.md). `pnpm host:setup`
+# installs these into host/.venv, with a PyTorch build that matches the
+# machine's CUDA toolkit; gsplat compiles its CUDA code on first use.
 torch>=2.1
 gsplat>=1.4
 numpy

@@ -29,8 +29,9 @@ web/.brush/
 web/pkg/
 dist-web
 
-# Native Brush built by `pnpm host:brush`
+# Native Brush and the gsplat environment, made by `pnpm host:setup`
 host/bin/
+host/.venv/
 __pycache__/
 
 # Local wrangler cache (web deploy)

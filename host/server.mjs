@@ -7,7 +7,7 @@
 //
 //   node host/server.mjs [--port 1441] [--listen 127.0.0.1] [--token <secret>]
 //                        [--gpus 0,1] [--jobs-per-gpu 1] [--work <folder>]
-//                        [--brush host/bin/brush] [--python python3]
+//                        [--brush host/bin/brush] [--python host/.venv/bin/python]
 //                        [--serve dist-web] [--fake]
 //   node host/server.mjs --check     lists GPUs and trainers, then exits
 //
@@ -50,7 +50,8 @@ export async function createHost(o = {}) {
     token: o.token ?? null,
     work: o.work ?? join(tmpdir(), "gausify-host"),
     brush: o.brush ?? join(here, "bin", process.platform === "win32" ? "brush.exe" : "brush"),
-    python: o.python ?? "python3",
+    // The environment host/setup.sh creates, when it is there.
+    python: o.python ?? (existsSync(join(here, ".venv", "bin", "python")) ? join(here, ".venv", "bin", "python") : "python3"),
     serve: o.serve ?? null,
     fake: !!o.fake,
     perGpu: o.perGpu ?? 1,
@@ -84,7 +85,7 @@ export async function createHost(o = {}) {
       const [gs, torch, n] = py.out.split("\n").pop().split(" ");
       b.gsplat = Number(n) > 0 ? { ok: true, detail: `gsplat ${gs}, torch ${torch}, ${n} CUDA device${n === "1" ? "" : "s"}` } : { ok: false, detail: `gsplat ${gs} is installed but torch ${torch} sees no CUDA device` };
     } else {
-      b.gsplat = { ok: false, detail: `${opts.python} can't import torch and gsplat: pip install -r host/requirements.txt` };
+      b.gsplat = { ok: false, detail: `${opts.python} can't import torch and gsplat: run "pnpm host:setup"` };
     }
     if (opts.fake) b.fake = { ok: true, detail: "no GPU; a stand-in for developing the integration" };
     return (backendsCache = b);

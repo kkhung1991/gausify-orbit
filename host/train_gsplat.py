@@ -10,6 +10,7 @@ the app reads. host/server.mjs starts it with one GPU visible
       [--sh-degree 1] [--max-splats 2000000] [--max-resolution 1920]
       [--ssim-weight 0.2] [--export-every 2500] [--eval-split-every 0]
       [--lr-mean 1.6e-4] [--growth-stop-iter N] [--masked] [--seed 42]
+  python host/train_gsplat.py --self-test     renders a test image on the GPU
 
 Follows gsplat's examples/simple_trainer.py (3DGS defaults, DefaultStrategy),
 with the schedule scaled to the run's length. Masked runs train over a
@@ -29,8 +30,11 @@ import time
 import numpy as np
 
 
+PLAIN = False  # --self-test: messages for a person, not for the host
+
+
 def say(**event):
-    print(json.dumps(event), flush=True)
+    print(event.get("line", "") if PLAIN else json.dumps(event), flush=True)
 
 
 # ---------- COLMAP binary model ----------
@@ -423,17 +427,65 @@ def parse_args(argv=None):
     return args
 
 
-def main():
-    args = parse_args()
+def ready():
+    """Imports torch and gsplat and makes sure gsplat's CUDA code is compiled
+    (it compiles on first use, with the CUDA toolkit's nvcc). Returns
+    (torch, gsplat), or None after saying what is missing."""
     try:
         import torch
-        import gsplat  # noqa: F401
+        import gsplat
     except ImportError as e:
-        say(t="log", line=f"{e}: pip install -r host/requirements.txt")
-        return 1
+        say(t="log", line=f"{e}: run pnpm host:setup")
+        return None
     if not torch.cuda.is_available():
         say(t="log", line="torch sees no CUDA device: gsplat trains on NVIDIA GPUs only")
+        return None
+    from gsplat.cuda import _backend
+
+    if _backend._C is None:
+        say(t="log", line="gsplat has no compiled CUDA code: it needs the CUDA toolkit (nvcc) and g++; see pnpm host:setup")
+        return None
+    return torch, gsplat
+
+
+def self_test():
+    """Renders and back-propagates a few Gaussians on the GPU: what
+    host/setup.sh runs to know the trainer really works here."""
+    global PLAIN
+    PLAIN = True
+    mods = ready()
+    if not mods:
         return 1
+    torch, gsplat = mods
+    from gsplat.rendering import rasterization
+
+    device = "cuda"
+    n = 256
+    means = torch.nn.Parameter((torch.rand(n, 3, device=device) - 0.5) * 2)
+    quats = torch.nn.functional.normalize(torch.randn(n, 4, device=device), dim=-1)
+    view = torch.eye(4, device=device)
+    view[2, 3] = 4.0
+    K = torch.tensor([[64.0, 0, 32], [0, 64.0, 32], [0, 0, 1]], device=device)
+    image, alpha, _ = rasterization(
+        means=means, quats=quats, scales=torch.full((n, 3), 0.05, device=device), opacities=torch.full((n,), 0.5, device=device),
+        colors=torch.rand(n, 3, device=device), viewmats=view[None], Ks=K[None], width=64, height=64, packed=False,
+    )
+    image.sum().backward()
+    if not (float(alpha.sum()) > 0 and means.grad is not None and bool(torch.isfinite(means.grad).all())):
+        print("gsplat rendered an empty image")
+        return 1
+    print(f"gsplat {gsplat.__version__}, torch {torch.__version__} (CUDA {torch.version.cuda}) on {torch.cuda.get_device_name(0)}: rendering and gradients work")
+    return 0
+
+
+def main():
+    if "--self-test" in sys.argv[1:]:
+        return self_test()
+    args = parse_args()
+    mods = ready()
+    if not mods:
+        return 1
+    torch, gsplat = mods
     say(t="log", line=f"gsplat {gsplat.__version__} on {torch.cuda.get_device_name(0)}")
     try:
         train(args)
