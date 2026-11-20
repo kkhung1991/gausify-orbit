@@ -1,8 +1,8 @@
-import type { MaskOptions, PoseEstimator, Stage } from "./api";
+import type { MaskOptions, PoseEstimator, Stage, TrainBackend } from "./api";
 import type { Messages } from "../i18n";
 
 /** Short label of each stage's tool. */
-export function stageToolLabels(t: Messages, masks?: MaskOptions, images?: boolean, estimator?: PoseEstimator): Record<Stage, string> {
+export function stageToolLabels(t: Messages, masks?: MaskOptions, images?: boolean, estimator?: PoseEstimator, trainBackend?: TrainBackend): Record<Stage, string> {
   const p = t.platform;
   return {
     frames: images ? p.yourImages : p.browserDecoder,
@@ -15,7 +15,7 @@ export function stageToolLabels(t: Messages, masks?: MaskOptions, images?: boole
             ? p.maskSource
             : "RMBG-1.4 · WebGPU",
     poses: estimator === "colmap" ? p.webPosesColmap : p.webPoses,
-    train: "Brush · WebGPU",
+    train: trainBackend === "brush" ? "Brush · Vulkan · host" : trainBackend === "gsplat" ? "gsplat · CUDA · host" : "Brush · WebGPU",
   };
 }
 

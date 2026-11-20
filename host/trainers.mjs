@@ -55,8 +55,8 @@ export function parseBrushLine(raw) {
   let m = /Refine iter (\d+), (\d+) splats/.exec(line);
   if (m) return { t: "step", iter: Number(m[1]), splats: Number(m[2]) };
   // From host/brush/progress.patch: refine lines stop once growth does.
-  m = /^Step iter (\d+)/.exec(line);
-  if (m) return { t: "step", iter: Number(m[1]) };
+  m = /^Step iter (\d+)(?:, (\d+) splats)?/.exec(line);
+  if (m) return m[2] ? { t: "step", iter: Number(m[1]), splats: Number(m[2]) } : { t: "step", iter: Number(m[1]) };
   m = /Eval iter (\d+): PSNR ([\d.eE+-]+), ssim ([\d.eE+-]+)/.exec(line);
   if (m) return { t: "eval", iter: Number(m[1]), psnr: Number(m[2]), ssim: Number(m[3]) };
   m = /Loaded dataset with (\d+) training, (\d+) eval views/.exec(line);

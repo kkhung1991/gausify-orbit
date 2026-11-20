@@ -101,7 +101,7 @@ test("the app's training options become a Brush command line", () => {
 
 test("Brush's log lines become events", () => {
   assert.deepEqual(parseBrushLine("[2026-10-04T19:51:20Z INFO  brush_cli] Refine iter 801, 13799 splats."), { t: "step", iter: 801, splats: 13799 });
-  assert.deepEqual(parseBrushLine("[2026-10-04T19:51:20Z INFO  brush_cli] Step iter 825"), { t: "step", iter: 825 });
+  assert.deepEqual(parseBrushLine("[2026-10-04T19:51:20Z INFO  brush_cli] Step iter 825, 20412 splats"), { t: "step", iter: 825, splats: 20412 });
   assert.deepEqual(parseBrushLine("Eval iter 1200: PSNR 32.510826, ssim 0.9530626"), { t: "eval", iter: 1200, psnr: 32.510826, ssim: 0.9530626 });
   assert.deepEqual(parseBrushLine("[x INFO  brush_cli] Loaded dataset with 118 training, 8 eval views"), { t: "dataset", train: 118, eval: 8 });
   assert.deepEqual(parseBrushLine("[x WARN  brush_cli] something odd"), { t: "log", line: "something odd" });

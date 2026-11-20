@@ -207,7 +207,7 @@ export async function createHost(o = {}) {
         if (tail.length > 30) tail.shift();
       }
       if (e.t === "step") {
-        // Brush's step lines carry no splat count; keep the last one known.
+        // A step line without a splat count keeps the last one known.
         if (e.splats != null) job.splats = e.splats;
         else e.splats = job.splats;
         job.iter = e.iter;

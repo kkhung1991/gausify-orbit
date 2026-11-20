@@ -1101,6 +1101,7 @@ function AppView() {
           masks={maskOpts}
           images={!!imageSet}
           estimator={estimator}
+          trainBackend={trainHost.backend}
           blocked={blocked}
           busy={anyRunning || retouchBusy || !!bulk?.running}
           onRunStage={(st) => item && run(item.id, st, st)}

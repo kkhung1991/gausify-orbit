@@ -1,16 +1,35 @@
 diff --git a/apps/brush-cli/src/lib.rs b/apps/brush-cli/src/lib.rs
-index f6b4b1c..5357ca7 100644
+index f6b4b1c..a4859f3 100644
 --- a/apps/brush-cli/src/lib.rs
 +++ b/apps/brush-cli/src/lib.rs
-@@ -249,6 +249,12 @@ pub async fn run_cli_ui(
+@@ -188,6 +188,7 @@ pub async fn run_cli_ui(
+     #[allow(unused_mut)]
+     let mut duration = Duration::from_secs(0);
+     let mut eval_every = train_stream_config.process_config.eval_every;
++    let mut splat_count = 0;
+ 
+     while let Some(msg) = messages.recv().await {
+         let _span = trace_span!("CLI UI").entered();
+@@ -213,7 +214,9 @@ pub async fn run_cli_ui(
+                 }
+                 main_spinner.set_message(format!("Loading {name}..."));
+             }
+-            ProcessMessage::SplatsUpdated { .. } => {}
++            ProcessMessage::SplatsUpdated { num_splats, .. } => {
++                splat_count = num_splats;
++            }
+             ProcessMessage::TrainMessage(train) => match train {
+                 TrainMessage::TrainConfig { config } => {
+                     train_progress.set_length(config.train_config.total_iters() as u64);
+@@ -249,6 +252,12 @@ pub async fn run_cli_ui(
                      }
                      train_progress.set_position(iter as u64);
                      duration = total_elapsed;
-+                    // The progress bar only draws on a TTY, and refine lines
-+                    // stop once growth does: a plain line for whoever runs
-+                    // the CLI as a child process.
++                    // The progress bar only draws on a terminal, and refine
++                    // lines stop once growth does: a plain line for whoever
++                    // runs the CLI as a child process.
 +                    if iter % 25 == 0 {
-+                        log::info!("Step iter {iter}");
++                        log::info!("Step iter {iter}, {splat_count} splats");
 +                    }
                  }
                  TrainMessage::RefineStep {

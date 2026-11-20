@@ -18,7 +18,10 @@ downloads the splat. Everything after that (export, mesh, retouch, share)
 works as usual.
 
 None of them splits one training run across GPUs: an orbit is a small scene,
-and one GPU trains it in minutes. Two GPUs train **two videos at once**.
+and one GPU trains it in minutes. Two GPUs train **two videos at once**: the
+host gives each job its own GPU. In the app, "Process all" still handles one
+video after another, so to keep both GPUs busy open the app in two tabs with
+different videos, or use the [headless batch](#without-a-display-one-chrome-per-gpu).
 
 ## The training host
 
@@ -120,20 +123,32 @@ works. If `chrome://gpu` shows WebGPU disabled, start Chrome with
 
 ## What has been run, and what hasn't
 
-Developed on a machine without a GPU:
+Developed on a machine without a GPU, on software Vulkan (Mesa's llvmpipe,
+Chrome's SwiftShader):
 
-- **Run:** the host's API, queue and cancellation, with a stand-in trainer
-  (`pnpm test:web`, `host/host.test.ts`); native Brush built from the pinned
-  commit with all patches and training a small synthetic orbit through the
-  host on a software Vulkan device; `train_gsplat.py` end to end on CPU with
-  gsplat's rasterizer replaced by a stand-in (data loading, densification,
-  evaluation, `.ply` export); headless Chrome on Linux getting a WebGPU
-  adapter with the Vulkan flags.
-- **Not run:** anything on an NVIDIA GPU. That leaves gsplat's CUDA
-  rasterizer in the training loop, GPU selection on a real two-GPU machine
-  (all three mechanisms), and every speed figure. Run
-  `node host/server.mjs --check` first, and compare a first splat from each
-  trainer against the browser's on the same video.
+- **Host: Brush.** The whole path ran: the app in headless Chrome on Linux
+  did frames and poses (40/40 cameras on a synthetic orbit), uploaded the
+  dataset, native Brush trained it and the splat came back with its previews
+  and PSNR. Native Brush builds from the pinned commit with every patch.
+- **Host: gsplat.** `train_gsplat.py` ran end to end on CPU with gsplat's
+  rasterizer replaced by a stand-in (data loading, cutouts, densification,
+  evaluation, `.ply` export, and the app's reader loading the result). The
+  CUDA rasterizer in the training loop has never run.
+- **This browser, on Linux.** Headless Chrome with the Vulkan flags gets a
+  WebGPU adapter and the pipeline runs to the end, `host-batch.mjs` included.
+  On SwiftShader the in-browser training ends with a wrong result, though
+  (PSNR 7 dB where native Brush reaches 18 dB with the same poses and
+  settings). That training path is unchanged and had only ever run on Metal,
+  so whether it is the software renderer or Linux Vulkan in general is open.
+- **The host itself:** API, queue, cancellation and abandoned jobs, with a
+  stand-in trainer (`pnpm test:web`, `host/host.test.ts`).
+- **Not run at all:** anything on an NVIDIA GPU. GPU selection on a real
+  two-GPU machine (all three mechanisms) and every speed figure are
+  untested.
+
+So on the real machine: run `node host/server.mjs --check`, then train one
+video with each option and compare the three splats and their PSNR (turn on
+**Measure quality**) before relying on any of them.
 
 `node host/server.mjs --fake` adds a trainer that needs no GPU, for working
 on the integration.
